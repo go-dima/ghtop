@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -22,14 +22,6 @@ class Config:
     pinned_repo: Optional[str] = None
     refresh_interval: int = 30   # Screen 3 poll interval (seconds)
     pr_limit: int = 50           # max PRs after merge+dedup
-
-    def __eq__(self, other):
-        if not isinstance(other, Config):
-            return False
-        return (self.pinned_org == other.pinned_org and
-                self.pinned_repo == other.pinned_repo and
-                self.refresh_interval == other.refresh_interval and
-                self.pr_limit == other.pr_limit)
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> Config:
