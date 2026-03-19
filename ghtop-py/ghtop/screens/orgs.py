@@ -93,7 +93,7 @@ class OrgScreen(Screen):
         pinned_idx = next(
             (i for i, o in enumerate(orgs) if o.is_pinned), None
         )
-        if pinned_idx:
+        if pinned_idx is not None:
             list_view.index = pinned_idx
 
     def action_select(self) -> None:
