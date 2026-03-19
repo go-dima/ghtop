@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
 from textual.timer import Timer
-from textual.widgets import DataTable, Static
+from textual.widgets import DataTable, Input, Static
 
 from ghtop.config import ACTIONS_REFRESH_INTERVAL
 from ghtop.gh import gh, GHError
@@ -40,6 +40,7 @@ class ActionsScreen(Screen):
         Binding("r", "open_run_browser", "Open Run"),
         Binding("l", "open_job_browser", "Open Job"),
         Binding("o", "open_pr_browser", "Open PR"),
+        Binding("slash", "search", "Search"),
         Binding("ctrl+r", "refresh", "Refresh"),
         Binding("q", "quit_app", "Quit"),
     ]
@@ -50,22 +51,26 @@ class ActionsScreen(Screen):
         self._repo = repo
         self._pr = pr
         self._jobs: list[dict] = []
+        self._filtered_jobs: list[dict] = []
         self._run_id: Optional[int] = None
         self._scroll_row: int = 0
         self._pending_rerun: bool = False
         self._pending_rerun_timer: Optional[Timer] = None
         self._poll_worker = None
+        self._searching = False
 
     def compose(self) -> ComposeResult:
         yield AppHeader()
         yield Static("", id="pr-meta")
+        yield Input(placeholder="Search workflows/jobs...", id="search-input")
         yield DataTable(id="jobs-table")
         yield Static("", id="empty-state")
-        yield StatusBar("t×2 rerun  l job browser  r run browser  o PR  Esc back  q quit")
+        yield StatusBar("/ search  t×2 rerun  l job browser  r run browser  o PR  Esc back  q quit")
 
     async def on_mount(self) -> None:
         table = self.query_one(DataTable)
         table.add_columns("WORKFLOW", "JOB", "STATUS", "DURATION")
+        self.query_one("#search-input").display = False
         table.focus()
         await self._load_jobs()
         self._start_poll()
@@ -121,6 +126,7 @@ class ActionsScreen(Screen):
             return
 
         self._jobs = (run_detail or {}).get("jobs", [])
+        self._filtered_jobs = list(self._jobs)
         self._render_table()
         self._update_header(self._jobs)
         self.query_one(AppHeader).error = ""
@@ -152,9 +158,9 @@ class ActionsScreen(Screen):
     def _render_table(self) -> None:
         table = self.query_one(DataTable)
         table.clear()
-        if not self._jobs:
+        if not self._filtered_jobs:
             return
-        for job in self._jobs:
+        for job in self._filtered_jobs:
             status = job.get("status", "")
             conclusion = job.get("conclusion")
             state = conclusion if status == "completed" and conclusion else status
@@ -168,15 +174,15 @@ class ActionsScreen(Screen):
                 f"{icon} {state}",
                 duration,
             )
-        if self._scroll_row < len(self._jobs):
+        if self._scroll_row < len(self._filtered_jobs):
             table.move_cursor(row=self._scroll_row)
 
     def action_view_logs(self) -> None:
         row = self.query_one(DataTable).cursor_row
         self._scroll_row = row
-        if row >= len(self._jobs):
+        if row >= len(self._filtered_jobs):
             return
-        job = self._jobs[row]
+        job = self._filtered_jobs[row]
         from ghtop.screens.logs import LogsScreen
         self.app.push_screen(LogsScreen(
             run_id=self._run_id,
@@ -240,8 +246,41 @@ class ActionsScreen(Screen):
         except GHError as e:
             self.notify(f"Could not open browser: {e}", severity="warning")
 
+    def action_search(self) -> None:
+        self._searching = True
+        inp = self.query_one("#search-input", Input)
+        inp.display = True
+        inp.focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        query = event.value.lower()
+        if not query:
+            self._filtered_jobs = list(self._jobs)
+        else:
+            self._filtered_jobs = [
+                j for j in self._jobs
+                if query in j.get("workflowName", "").lower()
+                or query in j.get("name", "").lower()
+            ]
+        self._render_table()
+
+    def on_input_submitted(self, _: Input.Submitted) -> None:
+        self._close_search()
+
+    def _close_search(self) -> None:
+        self._searching = False
+        inp = self.query_one("#search-input", Input)
+        inp.value = ""
+        inp.display = False
+        self._filtered_jobs = list(self._jobs)
+        self._render_table()
+        self.query_one(DataTable).focus()
+
     def action_go_back(self) -> None:
-        self.app.pop_screen()
+        if self._searching:
+            self._close_search()
+        else:
+            self.app.pop_screen()
 
     def action_refresh(self) -> None:
         self.run_worker(self._load_jobs(), exclusive=True)
