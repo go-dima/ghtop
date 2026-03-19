@@ -84,3 +84,13 @@ async def test_gh_raw_returns_text():
     with patch("asyncio.create_subprocess_exec", return_value=proc):
         result = await gh_raw("run", "view", "123", "--log")
     assert result == "build\tstep1\tlog line\n"
+
+
+@pytest.mark.asyncio
+async def test_gh_raw_nonzero_exit_raises_gherror():
+    from ghtop.gh import gh_raw
+    proc = make_proc(returncode=1, stderr=b'error: access denied')
+    with patch("asyncio.create_subprocess_exec", return_value=proc):
+        with pytest.raises(GHError) as exc_info:
+            await gh_raw("run", "view", "123", "--log")
+    assert "access denied" in str(exc_info.value)
