@@ -30,7 +30,6 @@ class OrgScreen(Screen):
     BINDINGS = [
         Binding("up", "cursor_up", "Up", show=False),
         Binding("down", "cursor_down", "Down", show=False),
-        Binding("enter", "select", "Select"),
         Binding("p", "pin", "Pin"),
         Binding("q", "quit_app", "Quit"),
     ]
@@ -42,9 +41,9 @@ class OrgScreen(Screen):
         yield StatusBar("↑↓ navigate  Enter select  p pin  q quit")
 
     async def on_mount(self) -> None:
-        header = self.query_one(AppHeader)
-        header.breadcrumb = "ghtop"
+        self.query_one(AppHeader).breadcrumb = "ghtop"
         await self._load_orgs()
+        self.query_one(ListView).focus()
 
     async def _load_orgs(self) -> None:
         try:
@@ -96,7 +95,7 @@ class OrgScreen(Screen):
         if pinned_idx is not None:
             list_view.index = pinned_idx
 
-    def action_select(self) -> None:
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
         idx = self.query_one(ListView).index
         if idx is None or not hasattr(self, "_orgs"):
             return
