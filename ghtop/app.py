@@ -8,7 +8,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ghtop.config import load_config, save_config, DEFAULT_CONFIG_PATH, Config
-from ghtop.gh import gh, GHError
+from ghtop.gh import gh, gh_raw, GHError
 
 
 class ErrorScreen(Screen):
@@ -51,7 +51,7 @@ class GHTopApp(App):
             return
 
         try:
-            await gh("auth", "status")
+            await gh_raw("auth", "status")
         except GHError:
             self.push_screen(ErrorScreen(
                 "Not authenticated. Run: gh auth login"
