@@ -12,7 +12,8 @@ class AppHeader(Widget):
     DEFAULT_CSS = """
     AppHeader {
         height: auto;
-        background: $primary;
+        background: $surface;
+        border-bottom: tall $primary;
         padding: 0 1;
     }
     #error-banner {

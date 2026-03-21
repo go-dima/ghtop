@@ -28,6 +28,8 @@ class OrgItem:
 
 class OrgScreen(Screen):
     BINDINGS = [
+        Binding("enter", "select", "Select", show=False, priority=True),
+        Binding("s", "select", "Select"),
         Binding("p", "pin", "Pin"),
         Binding("q", "quit_app", "Quit"),
     ]
@@ -83,17 +85,15 @@ class OrgScreen(Screen):
             return
 
         self._orgs = orgs
-        for item in orgs:
-            list_view.append(ListItem(Static(item.label())))
+        await list_view.extend([ListItem(Static(item.label())) for item in orgs])
 
-        # Move pinned item to top of list
+        # Set initial cursor position (must happen after items are in _nodes)
         pinned_idx = next(
             (i for i, o in enumerate(orgs) if o.is_pinned), None
         )
-        if pinned_idx is not None:
-            list_view.index = pinned_idx
+        list_view.index = pinned_idx if pinned_idx is not None else 0
 
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
+    def action_select(self) -> None:
         idx = self.query_one(ListView).index
         if idx is None or not hasattr(self, "_orgs"):
             return
