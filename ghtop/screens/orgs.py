@@ -28,8 +28,6 @@ class OrgItem:
 
 class OrgScreen(Screen):
     BINDINGS = [
-        Binding("up", "cursor_up", "Up", show=False),
-        Binding("down", "cursor_down", "Down", show=False),
         Binding("p", "pin", "Pin"),
         Binding("q", "quit_app", "Quit"),
     ]
@@ -125,12 +123,6 @@ class OrgScreen(Screen):
         items = list(list_view.query(ListItem))
         for i, item in enumerate(items):
             item.query_one(Static).update(self._orgs[i].label())
-
-    def action_cursor_up(self) -> None:
-        self.query_one(ListView).action_cursor_up()
-
-    def action_cursor_down(self) -> None:
-        self.query_one(ListView).action_cursor_down()
 
     def action_quit_app(self) -> None:
         self.app.exit()
