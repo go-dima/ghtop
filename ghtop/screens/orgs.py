@@ -45,6 +45,7 @@ class OrgScreen(Screen):
     async def on_mount(self) -> None:
         self.query_one(AppHeader).breadcrumb = "ghtop"
         await self._load_orgs()
+        self.query_one(ListView).focus()
 
     async def _load_orgs(self) -> None:
         try:
@@ -89,16 +90,11 @@ class OrgScreen(Screen):
         for item in orgs:
             list_view.append(ListItem(Static(item.label())))
 
+        # _nodes is populated synchronously by append(), so index can be set directly
         pinned_idx = next(
             (i for i, o in enumerate(orgs) if o.is_pinned), None
         )
-        initial_idx = pinned_idx if pinned_idx is not None else 0
-
-        def _init() -> None:
-            list_view.index = initial_idx
-            list_view.focus()
-
-        self.call_after_refresh(_init)
+        list_view.index = pinned_idx if pinned_idx is not None else 0
 
     def action_select(self) -> None:
         idx = self.query_one(ListView).index
