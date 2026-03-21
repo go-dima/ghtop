@@ -28,6 +28,8 @@ class OrgItem:
 
 class OrgScreen(Screen):
     BINDINGS = [
+        Binding("up", "cursor_up", "Up", show=False),
+        Binding("down", "cursor_down", "Down", show=False),
         Binding("enter", "select", "Select", show=False, priority=True),
         Binding("s", "select", "Select"),
         Binding("p", "pin", "Pin"),
@@ -43,7 +45,6 @@ class OrgScreen(Screen):
     async def on_mount(self) -> None:
         self.query_one(AppHeader).breadcrumb = "ghtop"
         await self._load_orgs()
-        self.query_one(ListView).focus()
 
     async def _load_orgs(self) -> None:
         try:
@@ -85,13 +86,19 @@ class OrgScreen(Screen):
             return
 
         self._orgs = orgs
-        await list_view.extend([ListItem(Static(item.label())) for item in orgs])
+        for item in orgs:
+            list_view.append(ListItem(Static(item.label())))
 
-        # Set initial cursor position (must happen after items are in _nodes)
         pinned_idx = next(
             (i for i, o in enumerate(orgs) if o.is_pinned), None
         )
-        list_view.index = pinned_idx if pinned_idx is not None else 0
+        initial_idx = pinned_idx if pinned_idx is not None else 0
+
+        def _init() -> None:
+            list_view.index = initial_idx
+            list_view.focus()
+
+        self.call_after_refresh(_init)
 
     def action_select(self) -> None:
         idx = self.query_one(ListView).index
@@ -123,6 +130,12 @@ class OrgScreen(Screen):
         items = list(list_view.query(ListItem))
         for i, item in enumerate(items):
             item.query_one(Static).update(self._orgs[i].label())
+
+    def action_cursor_up(self) -> None:
+        self.query_one(ListView).action_cursor_up()
+
+    def action_cursor_down(self) -> None:
+        self.query_one(ListView).action_cursor_down()
 
     def action_quit_app(self) -> None:
         self.app.exit()
