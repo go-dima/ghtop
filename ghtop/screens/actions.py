@@ -45,9 +45,9 @@ class ActionsScreen(Screen):
         Binding("q", "quit_app", "Quit"),
     ]
 
-    def __init__(self, org: str, repo: str, pr: dict) -> None:
+    def __init__(self, owner: str, repo: str, pr: dict) -> None:
         super().__init__()
-        self._org = org
+        self._owner = owner
         self._repo = repo
         self._pr = pr
         self._jobs: list[dict] = []
@@ -65,7 +65,7 @@ class ActionsScreen(Screen):
         yield Input(placeholder="Search workflows/jobs...", id="search-input")
         yield DataTable(id="jobs-table")
         yield Static("", id="empty-state")
-        yield StatusBar("/ search  t×2 rerun  l job browser  r run browser  o PR  Esc back  q quit")
+        yield StatusBar("↑↓ navigate  Enter logs  / search  t×2 rerun  r run  l job  o PR  Esc back  q quit")
 
     async def on_mount(self) -> None:
         table = self.query_one(DataTable)
@@ -91,12 +91,20 @@ class ActionsScreen(Screen):
             self._pending_rerun_timer.stop()
 
     async def _load_jobs(self) -> None:
+        header = self.query_one(AppHeader)
+        header.loading = True
+        try:
+            await self._fetch_jobs()
+        finally:
+            header.loading = False
+
+    async def _fetch_jobs(self) -> None:
         runs = self._pr.get("_runs", [])
         if not runs:
             try:
                 runs = await gh(
                     "run", "list",
-                    "--repo", f"{self._org}/{self._repo}",
+                    "--repo", f"{self._owner}/{self._repo}",
                     "--branch", self._pr.get("headRefName", ""),
                     "--limit", "1",
                     "--json", "databaseId,name,status,conclusion,startedAt,updatedAt",
@@ -118,7 +126,7 @@ class ActionsScreen(Screen):
         try:
             run_detail = await gh(
                 "run", "view", str(self._run_id),
-                "--repo", f"{self._org}/{self._repo}",
+                "--repo", f"{self._owner}/{self._repo}",
                 "--json", "jobs",
             )
         except GHError as e:
@@ -139,7 +147,7 @@ class ActionsScreen(Screen):
         breadcrumb = (
             f"PR #{pr['number']}: {pr['title'][:50]}   "
             f"{icon} {status}   "
-            f"{self._org}/{self._repo} · {pr['author']['login']} · {age}"
+            f"{self._owner}/{self._repo} · {pr['author']['login']} · {age}"
         )
         self.query_one(AppHeader).breadcrumb = breadcrumb
 
@@ -186,7 +194,7 @@ class ActionsScreen(Screen):
         from ghtop.screens.logs import LogsScreen
         self.app.push_screen(LogsScreen(
             run_id=self._run_id,
-            repo=f"{self._org}/{self._repo}",
+            repo=f"{self._owner}/{self._repo}",
             job_name=job.get("name", ""),
             pr_number=self._pr["number"],
             workflow_name=job.get("workflowName", ""),
@@ -210,7 +218,7 @@ class ActionsScreen(Screen):
     async def _do_rerun(self) -> None:
         try:
             await gh("run", "rerun", str(self._run_id),
-                     "--repo", f"{self._org}/{self._repo}", "--failed")
+                     "--repo", f"{self._owner}/{self._repo}", "--failed")
             self.notify("Rerun triggered", severity="information")
             await asyncio.sleep(2)
             await self._load_jobs()
@@ -228,7 +236,7 @@ class ActionsScreen(Screen):
     async def _open_run(self, run_id: int) -> None:
         try:
             await gh("run", "view", str(run_id),
-                     "--repo", f"{self._org}/{self._repo}", "--web")
+                     "--repo", f"{self._owner}/{self._repo}", "--web")
         except GHError as e:
             self.notify(f"Could not open browser: {e}", severity="warning")
 
@@ -242,7 +250,7 @@ class ActionsScreen(Screen):
     async def _open_pr(self) -> None:
         try:
             await gh("pr", "view", str(self._pr["number"]),
-                     "--repo", f"{self._org}/{self._repo}", "--web")
+                     "--repo", f"{self._owner}/{self._repo}", "--web")
         except GHError as e:
             self.notify(f"Could not open browser: {e}", severity="warning")
 

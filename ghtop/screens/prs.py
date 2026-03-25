@@ -77,9 +77,9 @@ class PRsScreen(Screen):
         Binding("q", "quit_app", "Quit"),
     ]
 
-    def __init__(self, org: str, repo: str) -> None:
+    def __init__(self, owner: str, repo: str) -> None:
         super().__init__()
-        self._org = org
+        self._owner = owner
         self._repo = repo
         self._filter_mine: bool = True
         self._prs: list[dict] = []
@@ -88,30 +88,46 @@ class PRsScreen(Screen):
         self._scroll_row: int = 0
         self._searching = False
 
+    DEFAULT_CSS = """
+    #pr-table {
+        height: 1fr;
+    }
+    #info-line {
+        color: $text-muted;
+        padding: 0 1;
+    }
+    """
+
     def compose(self) -> ComposeResult:
         yield AppHeader()
+        yield Static("", id="info-line")
         yield Input(placeholder="Search PRs...", id="search-input")
         yield DataTable(id="pr-table")
-        yield Static("", id="empty-state")
         yield StatusBar("", id="status-bar-widget")
 
     async def on_mount(self) -> None:
         table = self.query_one(DataTable)
         table.add_columns("#", "TITLE", "AUTHOR", "AGE", "✓", "⟳", "✗", "⊘", "Σ")
         self.query_one("#search-input").display = False
+        self.query_one("#info-line").display = False
         self._update_header()
-        table.focus()
-        await self._load_prs()
+        self.run_worker(self._load_prs(), exclusive=True)
         self._start_poll()
 
-    def _update_header(self) -> None:
+    def _update_header(self, empty: bool = False) -> None:
         header = self.query_one(AppHeader)
         label = "My PRs" if self._filter_mine else "PRs"
-        header.breadcrumb = f"★ {self._org}/{self._repo} / {label}"
-        hint_m = "m=all" if self._filter_mine else "m=mine"
-        self.query_one("#status-bar-widget", StatusBar).update_hints(
-            f"★ {self._org}/{self._repo}  {hint_m}  / search  Esc back"
-        )
+        header.breadcrumb = f"★ {self._owner}/{self._repo} / {label}"
+        if empty:
+            hint_m = "m=all" if self._filter_mine else "m=mine"
+            self.query_one("#status-bar-widget", StatusBar).update_hints(
+                f"{hint_m}  ^r refresh  Esc back  q quit"
+            )
+        else:
+            hint_m = "m=all" if self._filter_mine else "m=mine"
+            self.query_one("#status-bar-widget", StatusBar).update_hints(
+                f"↑↓ navigate  Enter PR  {hint_m}  / search  ^r refresh  Esc back  q quit"
+            )
 
     def _start_poll(self) -> None:
         interval = self.app.config.refresh_interval
@@ -122,15 +138,23 @@ class PRsScreen(Screen):
                 if self.is_attached:
                     await self._load_prs()
 
-        self._worker = self.run_worker(poll(), exclusive=True)
+        self._worker = self.run_worker(poll(), exclusive=False)
 
     def on_unmount(self) -> None:
         if self._worker:
             self._worker.cancel()
 
     async def _load_prs(self) -> None:
+        header = self.query_one(AppHeader)
+        header.loading = True
+        try:
+            await self._fetch_prs()
+        finally:
+            header.loading = False
+
+    async def _fetch_prs(self) -> None:
         limit = self.app.config.pr_limit
-        repo_flag = f"{self._org}/{self._repo}"
+        repo_flag = f"{self._owner}/{self._repo}"
         base_args = [
             "pr", "list", "--repo", repo_flag,
             "--state", "open", "--limit", str(limit),
@@ -179,6 +203,7 @@ class PRsScreen(Screen):
         self._filtered = list(prs)
         self._render_table()
         self.query_one(AppHeader).error = ""
+        self.query_one(DataTable).focus()
 
     def _run_counts(self, pr: dict) -> tuple[int, int, int, int, int]:
         runs = pr.get("_runs", [])
@@ -203,13 +228,20 @@ class PRsScreen(Screen):
     def _render_table(self) -> None:
         table = self.query_one(DataTable)
         table.clear()
+        info = self.query_one("#info-line", Static)
         if not self._filtered:
-            self.query_one("#empty-state", Static).update(
-                "No open pull requests" if not self._filter_mine
-                else "No PRs matching filter"
+            msg = (
+                "No open pull requests in this repo"
+                if not self._filter_mine
+                else "No open PRs authored by you or awaiting your review"
             )
+            info.update(msg)
+            info.display = True
+            self._update_header(empty=True)
             return
-        self.query_one("#empty-state", Static).update("")
+        info.update("")
+        info.display = False
+        self._update_header(empty=False)
         for pr in self._filtered:
             s, r, f, c, total = self._run_counts(pr)
             age = _format_age(pr.get("createdAt", ""))
@@ -231,7 +263,7 @@ class PRsScreen(Screen):
         pr = self._filtered[row]
         from ghtop.screens.actions import ActionsScreen
         self.app.push_screen(ActionsScreen(
-            org=self._org, repo=self._repo, pr=pr
+            owner=self._owner, repo=self._repo, pr=pr
         ))
 
     def action_go_back(self) -> None:
@@ -255,7 +287,7 @@ class PRsScreen(Screen):
     async def _open_pr_browser(self, number: int) -> None:
         try:
             await gh("pr", "view", str(number),
-                     "--repo", f"{self._org}/{self._repo}", "--web")
+                     "--repo", f"{self._owner}/{self._repo}", "--web")
         except GHError as e:
             self.notify(f"Could not open browser. Error: {e}", severity="warning")
 

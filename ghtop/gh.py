@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from asyncio.subprocess import PIPE
+from asyncio.subprocess import DEVNULL, PIPE
 from typing import Any
 
 from ghtop.config import RATE_LIMIT_BACKOFF
@@ -31,7 +31,7 @@ async def _run_gh(*args: str) -> bytes:
     for attempt in range(attempts):
         proc = await asyncio.create_subprocess_exec(
             "gh", *args,
-            stdout=PIPE, stderr=PIPE,
+            stdin=DEVNULL, stdout=PIPE, stderr=PIPE,
         )
         stdout, stderr = await proc.communicate()
 

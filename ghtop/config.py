@@ -18,7 +18,7 @@ RATE_LIMIT_BACKOFF = [2, 4, 8]  # retry delays in seconds
 
 @dataclass
 class Config:
-    pinned_org: Optional[str] = None
+    pinned_owner: Optional[str] = None   # GitHub org or personal account login
     pinned_repo: Optional[str] = None
     refresh_interval: int = 30   # Screen 3 poll interval (seconds)
     pr_limit: int = 50           # max PRs after merge+dedup
@@ -30,8 +30,10 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> Config:
     try:
         raw = yaml.safe_load(path.read_text()) or {}
         pinned = raw.get("pinned") or {}
+        # Accept both "owner" (new) and "org" (legacy) keys
+        owner = pinned.get("owner") or pinned.get("org")
         return Config(
-            pinned_org=pinned.get("org"),
+            pinned_owner=owner,
             pinned_repo=pinned.get("repo"),
             refresh_interval=int(raw.get("refresh_interval", 30)),
             pr_limit=int(raw.get("pr_limit", 50)),
@@ -44,10 +46,10 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> Config:
 def save_config(cfg: Config, path: Path = DEFAULT_CONFIG_PATH) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data: dict = {}
-    if cfg.pinned_org or cfg.pinned_repo:
+    if cfg.pinned_owner or cfg.pinned_repo:
         data["pinned"] = {}
-        if cfg.pinned_org:
-            data["pinned"]["org"] = cfg.pinned_org
+        if cfg.pinned_owner:
+            data["pinned"]["owner"] = cfg.pinned_owner
         if cfg.pinned_repo:
             data["pinned"]["repo"] = cfg.pinned_repo
     if cfg.refresh_interval != 30:

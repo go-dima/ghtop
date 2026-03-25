@@ -24,7 +24,7 @@ ghtop-py/
 │   │   ├── actions.py       # Screen 4 — PR Actions Detail
 │   │   └── logs.py          # Screen 5 — Run Logs Viewer
 │   └── widgets/
-│       ├── header.py        # breadcrumb + refresh status + error banner
+│       ├── header.py        # breadcrumb + loading indicator (···) + error banner
 │       └── status_bar.py    # keybinding hints at bottom
 ├── pyproject.toml
 └── README.md
@@ -32,24 +32,23 @@ ghtop-py/
 
 ## Screens
 
-### Screen 1 — Org Selector
+### Screen 1 — Owner Selector
 ```
-ghtop   ↑↓ navigate  Enter select  p pin  q quit
+ghtop   ↑↓ navigate  Enter/s select  p pin  q quit
 
-Organizations (3)
 ▶ ★ my-org
     acme-corp
-    personal
-    [you] dima
+    go-dima [you]
 ```
-- `★` marks the pinned org
-- Personal account appended at bottom with `[you]` marker, fetched via `gh api /user`
-- If personal account login appears in `/user/orgs` response, deduplicate — show once with `[you]` marker
+- Lists GitHub orgs the user belongs to, plus their personal account (`[you]` suffix)
+- `★` marks the pinned owner (org or personal account)
+- `Enter` or `s` selects; `p` toggles pin
+- Personal account fetched via `gh api /user`; deduplicated if already in org list
 - Empty state: "No organizations found. Make sure you are authenticated: gh auth status"
 
-### Screen 2 — Repos in Org
+### Screen 2 — Repos in Owner
 ```
-★ my-org / repos (5)   Esc back  / search  p pin
+★ my-org / repos   ↑↓ navigate  Enter select  / search  p pin  ^r refresh  Esc back  q quit
 
 NAME            OPEN PRS   LAST ACTIVITY
 ▶ ★ backend-api   3          2m ago
@@ -58,8 +57,8 @@ NAME            OPEN PRS   LAST ACTIVITY
 ```
 - `OPEN PRS` from dedicated `gh pr list --state open --json number` call (not `openIssuesCount`)
 - Open PR count fetched concurrently for all repos with `asyncio.Semaphore(10)`
-- Repos paginated 20 per page, all pages fetched
-- Empty state: "No repositories found in <org>"
+- Repos fetched with `--limit 20`
+- Empty state shown as info line below header; status bar shows only applicable hints
 
 ### Screen 3 — PR List
 ```
@@ -77,7 +76,7 @@ NAME            OPEN PRS   LAST ACTIVITY
 - `✓` green / `⟳` blue / `✗` red / `⊘` orange / `○` blue (queued) / `○` gray (skipped)
 - `Σ` = total number of distinct workflows (latest run per workflow counted once)
 - Counts reflect latest run per workflow; PRs with no runs show `—`
-- Empty state: "No open pull requests" / "No PRs matching filter"
+- Empty state shown as info line below header ("No open PRs authored by you..." or "No open pull requests in this repo"); status bar shows only applicable hints (no navigation)
 - Filter state and scroll position **restored** when navigating back from Screen 4
 
 ### Screen 4 — PR Actions Detail
@@ -140,13 +139,14 @@ PR #42 · CI Pipeline · build   ⟳ running   Esc back  / search  q quit
 | Key | Action |
 |-----|--------|
 | `↑` / `↓` | Navigate list |
-| `Enter` | Drill down |
+| `Enter` | Drill down (Screens 1–4) |
+| `s` | Explicit select (Screen 1 only) |
 | `Esc` / `Backspace` | Go back one level (restores scroll + filter state) |
 | `p` | Pin/unpin (toggle; replaces existing pin) |
 | `m` | Toggle "my PRs" / all PRs filter (Screen 3) |
-| `/` | Fuzzy search overlay — case-insensitive, ranked by quality; Esc closes and clears filter |
-| `o` | Open PR in browser (all screens) |
-| `Ctrl+r` | Force refresh current screen (all screens) |
+| `/` | Search overlay — case-insensitive; live-filters rows in memory; `Esc` closes and clears |
+| `o` | Open PR in browser (Screens 3–4) |
+| `Ctrl+r` | Force refresh current screen |
 | `r` | Open current run in browser (Screen 4 only) |
 | `t` | Double-tap: rerun selected run (failed jobs only) (Screen 4) |
 | `l` | View selected job's run page in browser (Screen 4) |
@@ -173,10 +173,11 @@ All search: case-insensitive, results ranked by match quality.
 ## Pin Behavior
 - `p` on unpinned item → pins it (replaces any existing pin at any level)
 - `p` on pinned item → unpins it
-- Pinning a repo clears any existing org-only pin; pinning an org clears any existing repo pin
-- Pinned org → opens Screen 2 directly on launch
-- Pinned repo → opens Screen 3 (My PRs) directly on launch
-- If pinned org/repo no longer exists on launch → show warning, clear pin, navigate to Screen 1
+- Pinning a repo clears any existing owner-only pin; pinning an owner clears any existing repo pin
+- Pinned owner → opens Screen 2 directly on launch (OrgScreen pushed beneath so Escape works)
+- Pinned repo → opens Screen 3 (My PRs) directly on launch (full OrgScreen→ReposScreen→PRsScreen stack pushed)
+- If pinned owner/repo no longer exists on launch → error shown in AppHeader, pin cleared, navigate to Screen 1
+- Owner is validated via `gh api /users/{login}` (works for both orgs and personal accounts)
 - Config saved to `~/.config/ghtop/config.yaml`
 
 ## GitHub API Commands
@@ -185,7 +186,7 @@ All search: case-insensitive, results ranked by match quality.
 |------|---------|
 | List orgs | `gh api /user/orgs --paginate` |
 | Personal account | `gh api /user` |
-| List repos | `gh repo list <org> --limit 20 --json name,updatedAt` (paginate all pages) |
+| List repos | `gh repo list <owner> --limit 20 --json name,updatedAt` |
 | Open PR count per repo | `gh pr list --repo <org/repo> --state open --json number` |
 | List PRs | `gh pr list --repo <org/repo> --state open --limit <pr_limit> --json number,title,author,createdAt,headRefName,labels,reviewRequests` |
 | My PRs (authored) | add `--author @me` |
@@ -208,7 +209,7 @@ All search: case-insensitive, results ranked by match quality.
 # User-facing config (~/.config/ghtop/config.yaml)
 @dataclass
 class Config:
-    pinned_org: str | None = None
+    pinned_owner: str | None = None  # org login or personal account login
     pinned_repo: str | None = None
     refresh_interval: int = 30   # Screen 3 poll interval (seconds)
     pr_limit: int = 50           # max PRs after merge+dedup
@@ -224,7 +225,7 @@ RATE_LIMIT_BACKOFF = [2, 4, 8]  # retry delays in seconds
 async def gh(*args) -> dict | list | None:
     proc = await asyncio.create_subprocess_exec(
         "gh", *args,
-        stdout=PIPE, stderr=PIPE
+        stdin=DEVNULL, stdout=PIPE, stderr=PIPE  # DEVNULL prevents TTY contention
     )
     stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
@@ -236,18 +237,13 @@ async def gh(*args) -> dict | list | None:
 - **Rate limit backoff:** detect "rate limit" in stderr or HTTP 429 → retry after 2s, 4s, 8s (max 3 retries)
 
 ### `app.py` — startup + routing
-```python
-async def on_mount(self):
-    try:
-        await gh("auth", "status")
-    except GHError:
-        self.push_screen(ErrorScreen("Not authenticated. Run: gh auth login"))
-        return
-    # check config for pinned repo/org → push appropriate screen
-```
-- `push_screen()` / `pop_screen()` for navigation
-- Each screen is a Textual `Screen` subclass
-- Each screen stores scroll position and filter state; restored on pop
+- Checks `gh` is installed (`shutil.which`) → `ErrorScreen` if not
+- Checks auth via `gh auth status` → `ErrorScreen` if fails
+- Routes based on config: pinned repo → full stack; pinned owner → OrgScreen + ReposScreen; else OrgScreen
+- Full stack always pushed so `Esc` navigates back correctly at every level
+- Pin validation uses `gh api /users/{login}` (works for both orgs and personal accounts)
+- Errors (stale pins, etc.) shown in `AppHeader.error`, not as notification popups
+- `push_screen()` / `pop_screen()` for navigation; each screen is a Textual `Screen` subclass
 
 ### `screens/prs.py`
 - Textual `DataTable` for PR list
@@ -300,14 +296,14 @@ async def on_mount(self):
 | Rate limit | Exponential backoff: retry after 2s, 4s, 8s; show "⚠ Rate limited" in header |
 | Network error | "⚠ Offline — last updated Xs ago" in header; retry on next poll |
 | Malformed config | Log warning, use defaults |
-| Pinned item gone | Warning shown, pin cleared, navigate to Screen 1 |
+| Pinned item gone | Error shown in AppHeader, pin cleared, navigate to Screen 1 |
 | Browser open fails | Show URL in notification banner |
 
 ## Config File (`~/.config/ghtop/config.yaml`)
 ```yaml
 pinned:
-  org: my-org        # optional
-  repo: backend-api  # optional; setting repo clears org-only pin
+  owner: my-org      # optional — org login or personal account login (legacy key "org" also accepted)
+  repo: backend-api  # optional; setting repo clears owner-only pin
 refresh_interval: 30 # seconds — Screen 3 poll interval
 pr_limit: 50         # max PRs after merge+dedup of My PRs calls
 ```

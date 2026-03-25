@@ -7,7 +7,7 @@ def test_double_tap_state_machine():
     """_pending_rerun flag is managed correctly."""
     from ghtop.screens.actions import ActionsScreen
     screen = ActionsScreen(
-        org="acme", repo="api",
+        owner="acme", repo="api",
         pr={"number": 42, "title": "fix", "author": {"login": "alice"},
             "createdAt": "2026-03-19T10:00:00Z", "labels": [],
             "reviewRequests": [], "_runs": [], "headRefName": "fix/auth"}
@@ -51,6 +51,6 @@ async def test_actions_screen_renders():
          patch("shutil.which", return_value="/usr/bin/gh"):
         app = GHTopApp()
         async with app.run_test() as pilot:
-            app.push_screen(ActionsScreen(org="acme", repo="api", pr=sample_pr))
+            app.push_screen(ActionsScreen(owner="acme", repo="api", pr=sample_pr))
             await pilot.pause(1.0)
             assert isinstance(pilot.app.screen, ActionsScreen)

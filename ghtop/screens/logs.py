@@ -65,18 +65,23 @@ class LogsScreen(Screen):
         if not self._run_id:
             self.query_one("#empty-state", Static).update("No run ID available.")
             return
+        log_view = self.query_one(RichLog)
+        header = self.query_one(AppHeader)
+        header.loading = True
         try:
-            raw = await gh_raw(
-                "run", "view", str(self._run_id),
-                "--repo", self._repo,
-                "--log",
-            )
-        except GHError as e:
-            self.query_one(AppHeader).error = str(e)
-            return
-
-        self._all_lines = filter_log_lines(raw, self._job_name)
-        self._render_logs(self._all_lines)
+            try:
+                raw = await gh_raw(
+                    "run", "view", str(self._run_id),
+                    "--repo", self._repo,
+                    "--log",
+                )
+            except GHError as e:
+                header.error = str(e)
+                return
+            self._all_lines = filter_log_lines(raw, self._job_name)
+            self._render_logs(self._all_lines)
+        finally:
+            header.loading = False
 
     def _render_logs(self, lines: list[str]) -> None:
         log_view = self.query_one("#log-view", RichLog)
