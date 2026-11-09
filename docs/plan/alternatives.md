@@ -1,6 +1,6 @@
 # ghtop: alternatives considered
 
-*   **Status:** Draft
+*   **Status:** Reviewed 2026-11-09
 *   **Design doc:** [ghtop.md](../designs/ghtop.md)
 
 Each alternative was weighed during the brainstorm or drafting and rejected.
@@ -67,7 +67,7 @@ file holds the paths not taken for the main design.
 *   **Reason for rejection**: Rejected by author: Go + Bubble Tea, with gh-dash
     as a working reference, single binary install.
 *   **Exploration**: the author's notes on how cctop (Python + Textual) is
-    built: [python-alternative.md](../python-alternative.md).
+    built: on branch `feat/python-mvp` (the old doc was removed from `main`).
 
 ## Views
 
@@ -115,9 +115,10 @@ file holds the paths not taken for the main design.
 
 ### L. GitHub access through the `go-gh` library, or library for reads and `gh` for writes
 
-*   See [0009-github-access.md](../decisions/0009-github-access.md).
+*   See [concepts_brief.md, "GitHub access"](./concepts_brief.md#github-access).
 *   **Reason for rejection**: Rejected by author for now: a `gh` subprocess is
-    less code; the domain interfaces keep a later swap possible.
+    less code; `gh` calls live only in `internal/github` and
+    `internal/actions`, so a swap rewrites those two.
 
 ### M. YAML or a flat config file
 
@@ -131,8 +132,8 @@ file holds the paths not taken for the main design.
     ghtop.
 *   **Cons**: one tracker and two CI kinds exist; a plugin system is code and
     a contract to maintain with no second user.
-*   **Reason for rejection**: Rejected by author: small internal interfaces
-    with one implementation each.
+*   **Reason for rejection**: Rejected by author: concrete clients, one per
+    service; an interface is added when a second implementation exists.
 
 ### O. One large design document
 

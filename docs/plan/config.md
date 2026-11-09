@@ -1,25 +1,25 @@
 # ghtop config
 
-*   **Status:** Draft (format examples; full schema later)
-*   **Decided:** TOML at `~/.config/ghtop/config.toml`, Go regex matched
-    case-insensitively (brief decision #22). Placeholders only in this file.
+*   **Status:** Reviewed 2026-11-09 (check the example against the Keys table
+    before M1)
+*   **Decided:** TOML at `~/.config/ghtop/config.toml` (or `--config <path>`),
+    Go regex matched case-insensitively (brief decision #22). No `version`
+    key, no `${VAR}` expansion, no other lookup paths. Placeholders only in
+    this file.
 
 ## Example: TOML (chosen format)
 
 ```toml
-version = 1
-
 [github]
-org = "example-org"
-closed_days = 14
-involved_days = 14
-poll = "5m"
-budget_floor = "20%"
+org = "example-org"               # required; ghtop refuses to start without it
+closed_days = 14                  # Merged view window
+involved_days = 14                # Involved view window
 
 [tracker]
-kind = "jira"
+enabled = true
 site = "example.atlassian.net"
-key_pattern = 'EX-\d+'          # Go regex, matched case-insensitively
+key_pattern = 'EX-\d+'           # Go regex, matched case-insensitively
+status_order = ["In Progress", "Code Review", "QA", "Done"]
 
 [[tracker.quick_moves]]
 from = "In Progress"
@@ -32,28 +32,44 @@ transition = "Resolve"
 only_when_merged = true
 
 [jenkins]
-user = "${JENKINS_USER}"
+enabled = true
+user = "jenkins-user"             # or leave out and set JENKINS_USER
 hosts = ["ci.example.com"]
 job_pattern = '^/job/[^/]+/job/PR-\d+/$'
-follow_queue = true
-
-[[jenkins.presets."example-repo_x86"]]
-name = "default"
-params = {}
-
-[[jenkins.presets."example-repo_x86"]]
-name = "release"
-params = { BUILD_TYPE = "Release" }
 
 [ui]
+refresh = "5m"
 glyphs = "unicode"                # single-width symbols only
 strip_key_from_title = false      # opt-in: remove a leading ticket key
 ```
 
+## Keys
+
+| Key | Type | Default | Notes |
+|---|---|---|---|
+| `github.org` | string | required | refuse to start without it |
+| `github.closed_days` | int | 14 | Merged view window; minimum 1 |
+| `github.involved_days` | int | 14 | Involved view window; minimum 1 |
+| `tracker.enabled` | bool | false | Jira on/off |
+| `tracker.site` | string | required if enabled | `example.atlassian.net` |
+| `tracker.key_pattern` | regex | required if enabled | Go regex, case-insensitive |
+| `tracker.status_order` | list of strings | `[]` | ticket status order in the sort; unknown statuses last |
+| `tracker.quick_moves` | list of `{from, to, transition?, only_when_merged?}` | `[]` | used by `Ctrl-A` `m` |
+| `jenkins.enabled` | bool | false | Jenkins on/off |
+| `jenkins.user` | string | `$JENKINS_USER` | the token comes only from `JENKINS_TOKEN` |
+| `jenkins.hosts` | list of strings | required if enabled | exact hosts, no scheme, https only |
+| `jenkins.job_pattern` | regex | required if enabled | path of PR jobs allowed for Build Now |
+| `ui.refresh` | duration | `"5m"` | the one poll interval; minimum `1m` |
+| `ui.glyphs` | `"unicode"` or `"ascii"` | `"unicode"` | single-width only |
+| `ui.strip_key_from_title` | bool | false | |
+
+"Ready to merge" is not configured: it comes from GitHub's `reviewDecision`
+and `mergeStateStatus` (see implementation.md, file 14).
+
 What the example shows:
 
-*   Tables match providers (`[github]`, `[tracker]`, `[jenkins]`), so turning
-    a provider off means leaving its table out.
+*   Tables match sources (`[github]`, `[tracker]`, `[jenkins]`); `enabled`
+    turns Jira or Jenkins on or off in one line.
 *   Secrets never appear: `JENKINS_TOKEN` is read from the environment only.
 *   Single-quoted strings are raw, so regex is written as is (`'EX-\d+'`).
 *   Key patterns use a fixed prefix. A generic pattern such as
@@ -67,48 +83,42 @@ TOML costs to keep in mind:
 
 *   Lists of tables (`[[tracker.quick_moves]]`) repeat their header for every
     item, so long lists get long.
-*   Durations and percentages are strings (`"5m"`, `"20%"`) that ghtop parses.
+*   Durations are strings (`"5m"`) that ghtop parses.
 
 ## Alternative: YAML
 
-```yaml
-version: 1
+Format comparison: the TOML example above written in YAML.
 
+```yaml
 github:
   org: example-org            # required; ghtop refuses to start without it
   closed_days: 14             # Merged view window
-  involved_days: 14           # Involved view window (by last update)
-  poll: 5m                    # one interval for every view
-  budget_floor: 20%           # skip scheduled polls below this share left
+  involved_days: 14           # Involved view window
 
-tracker:                      # optional; ghtop runs without it
-  kind: jira
+tracker:
+  enabled: true
   site: example.atlassian.net
-  key_pattern: 'EX-\d+'      # Go regex; single quotes keep \d as is
+  key_pattern: 'EX-\d+'      # Go regex, matched case-insensitively
+  status_order: [In Progress, Code Review, QA, Done]
   quick_moves:
     - from: In Progress
       to: Code Review
     - from: Code Review
       to: Done
-      transition: Resolve     # needed when several transitions reach "Done"
+      transition: Resolve
       only_when_merged: true
 
-jenkins:                      # optional; token comes from JENKINS_TOKEN
-  user: ${JENKINS_USER}       # or a literal; never the token
+jenkins:
+  enabled: true
+  user: jenkins-user          # or leave out and set JENKINS_USER
   hosts:
-    - ci.example.com          # exact host match; https only
-  job_pattern: '^/job/[^/]+/job/PR-\d+/$'   # Build Now only on these paths
-  follow_queue: true
-  presets:                    # Build Now parameter presets, by job name
-    example-repo_x86:
-      - name: default
-        params: {}
-      - name: release
-        params:
-          BUILD_TYPE: Release
+    - ci.example.com
+  job_pattern: '^/job/[^/]+/job/PR-\d+/$'
 
 ui:
+  refresh: 5m
   glyphs: unicode             # single-width symbols only
+  strip_key_from_title: false # opt-in: remove a leading ticket key
 ```
 
 *   For: shorter nested lists and maps; k9s, gh-dash and `gh` use YAML.
@@ -129,10 +139,10 @@ jenkins_job_pattern: '^/job/[^/]+/job/PR-\d+/$'
 ```
 
 *   For: shortest file; matches pr-tracker's flat `config.js`.
-*   Rejected by author. Against: no clear way to switch a provider off (which keys belong to it?),
-    and quick moves and presets still need nesting.
+*   Rejected by author. Against: no clear way to switch a provider off
+    (which keys belong to it?), and quick moves still need nesting.
 
 ## Open points
 
-*   Should `${VAR}` expansion be allowed anywhere, or only in `jenkins.user`?
-*   Preset key: Jenkins job name, or the job URL path?
+None. (`${VAR}` expansion and Jenkins presets were dropped in the 2026-11-09
+review; Build Now with parameters is in DEFERRED.md.)

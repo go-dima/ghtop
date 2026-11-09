@@ -1,32 +1,19 @@
 # ghtop: my next tasks
 
 The task at the top of "Next" is the one to do now. When it is done, move it to
-"Done" with the date. File-level progress lives in `CHECKLIST.md`; this file
+"Done" with the date. Planning progress lives in `CHECKLIST.md`; this file
 tracks what I (the author) have to do or decide.
 
 ## Next
 
-0. **Review the design doc** with `/egm:egm-review docs/designs/ghtop.md`
-   (fresh-context Goldfish review).
-1. **Install Go** (latest stable, `brew install go`) before the UI spike.
-2. **Pick the branch plan.** Work on a `plan/v2` branch and merge to `main` when
-   planning is done, or commit straight to `main`. The planning files are
-   untracked until then.
-3. **Write down what broke in the old UI.** A few lines from memory: which
-   screens, what happened (freeze, lost focus, wrong row, slow), when. Goes into
-   the design doc.
-4. **Answer: PR-template checkbox for diagrams?** A "diagrams updated" checkbox
-   in the PR template, to keep `docs/architecture.md` in step with the code.
-5. **Session: frame.** Agents draft `README.md`,
-   `01-glossary.md` and decisions 0001-0008. I review each.
-6. **Session: data.** Agents draft `core/data-model.md` and
-   `services/_contract.md`. I review.
-7. **Session: mockups.** Agents draft `views/_layout.md` and the view files
-   with 2-3 mockup variants each. I pick flat row vs drill-down.
-8. **Session: UI spike.** Small code sample; record what we learned in
-   `spike/README.md`.
-9. **Sessions: behavior, services, config.** In `CHECKLIST.md` order.
-10. **Ready-to-code gate** (`CHECKLIST.md` Phase 6).
+1. **Install Go** (latest stable, `brew install go`) and `pre-commit`.
+2. **Session: commands.** Agent drafts `services/github.md` (every `gh` and
+   `twg` command with placeholders). I review.
+3. **Finish `config.md`.** Check the example against the Keys table.
+4. **Session: M1 detail.** Agent drafts the M1 section of `implementation.md`
+   (columns per view, drop order at 120/80, unanswered definitions, glyphs,
+   Row fields). I review.
+5. **M1: read-only GitHub + framework check.**
 
 ## Waiting on
 
@@ -34,12 +21,19 @@ tracks what I (the author) have to do or decide.
 
 ## Done
 
+- 2026-11-09: Plan review (Goldfish Stage 9 + over-engineering pass, log in
+  `docs/reviews/2026-11-09-decisions.md`). Planning set reduced, 3 milestones, no CI,
+  pre-commit hooks, concrete clients, ADR 0009 folded into the brief, old docs
+  deleted. Decided: Merged uses `updated:>=`, org required, PR template kept
+  (answers the PR-template question: yes), latest library versions. Branch
+  plan: work on `feat/v2`, merge to `main`.
+
 - 2026-11-08: Design doc finalized at `docs/designs/ghtop.md`; brief
   reconciled (decisions #25, #26).
 
 - 2026-11-08: Keymap session: `Ctrl-A` action menu (`r` re-run, `b` Build
   Now, `u` update branch, `m` move ticket), `1`-`4` views, vim movement,
-  `c`/`C` copy PR/ticket URL. See `core/keymap.md`.
+  `c`/`C` copy PR/ticket URL (dropped 2026-11-09). See `core/keymap.md`.
 
 - 2026-11-08: Added the "update branch" action (merge base into PR branch when
   no conflicts; open PR page when conflicts).

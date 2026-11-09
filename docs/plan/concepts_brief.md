@@ -30,8 +30,8 @@ Each row shows the PR state, the review state, CI state (GitHub Actions runs and
 Jenkins builds, both found through the PR's checks) and the linked issue-tracker
 ticket (Jira first, through the `twg` CLI). From the highlighted row the user can
 open the PR, ticket or build in the browser, move the ticket to another status,
-re-run a failed Actions run, start a Jenkins "Build Now" (with parameters when
-needed), and see why a run failed.
+re-run a failed Actions run, start a Jenkins "Build Now" (with the job's default
+parameters), and see why a run failed.
 
 The target user is a developer who wants to track their own PRs from the
 terminal. ghtop runs next to pr-tracker (a local web page with the same data). It
@@ -49,8 +49,8 @@ Six reviewers looked at the concept. Their findings, grouped and ranked.
 
 The first attempt specified five screens, a log viewer and pinning in two long
 plans (about 80% the same text) before any UI ran, and the UI ended up broken.
-A plan with 10+ files repeats that pattern at a larger size. The plan must name
-the root cause of the old UI bugs. Candidates seen in the old plans: the
+A plan with 10+ files repeats that pattern at a larger size. Likely causes of
+the old UI bugs, seen in the old plans: the
 framework's focus handling, one `gh run list` call per PR on a 10 s poll, and
 refresh results arriving while the user moved the cursor. Reviewers suggest a
 small UI spike (one table from one GraphQL call, `j/k`, `o`, `r`) early, so
@@ -83,7 +83,8 @@ host name. A host like `ci.example.com.attacker.io` passes that test, and anyone
 who can post a commit status can set that URL. ghtop sends `JENKINS_TOKEN` to
 these URLs. ghtop must parse the URL, require `https` and an exact host from
 the private config, and build the API URL from the parsed parts. "Build Now" runs
-only on job URLs that match a configured pattern.
+only on job URLs that match a configured pattern, and its queue URL is rebuilt
+from the configured host and the queue item id, never taken from `Location`.
 
 ### 4. Public repo: organization data leaks easily
 
@@ -95,8 +96,9 @@ from it brings these values along. Rules for ghtop:
 
 - Specs, mockups and test data use placeholders only (`example-org`, `EX-123`,
   `ci.example.com`).
-- A local pre-commit check greps for the private values. The list comes from the
-  private config, so it is not in the repo.
+- A local pre-commit check greps for the private values. The list comes from a
+  private denylist file (`~/.config/ghtop/leakguard.txt`), so it is not in
+  the repo.
 - Logs and caches go to user directories, never the repo.
 
 ### 5. Keyboard UX problems
@@ -178,9 +180,9 @@ then the rest) or apply inside each group?
   Jenkins answers with a queue item, not a build number, so ghtop must follow the
   queue item to find the new build. Parameter definitions come from the job's
   `api/json` and exist only after the first build of a multibranch PR job. A PR
-  with no Jenkins check yet has no job URL to use unless the config has a URL
-  template. API-token auth is normally exempt from the CSRF crumb; on "No valid
-  crumb", fetch one and retry once. One in-flight trigger per job.
+  with no Jenkins check yet has no job URL to use: the job URL is built only
+  from a check URL that matches the configured host and job pattern. No crumb
+  (API token auth needs none). One in-flight trigger per job.
 
 ### 9. Jira transitions
 
@@ -254,10 +256,10 @@ not provider names.
     for Actions and Jenkins, ticket key and status.
   * Keys (full list in `core/keymap.md`): arrows and `j/k` to move, `1`-`4`
     views; `o` open PR, `t` open ticket, `b` Jenkins build in browser (picker
-    if several), `a` Actions run view, `c`/`C` copy PR/ticket URL, `r`
-    refresh, `?` help, `:` command, `/` filter, `Enter` detail. Every change
-    goes through the `Ctrl-A` action menu, then confirm: `r` re-run failed
-    jobs, `b` Jenkins Build Now, `u` update branch, `m` Jira quick move.
+    if several), `a` Actions run view, `r` refresh, `?` help, `:` command,
+    `/` filter, `Enter` detail. Every change goes through the `Ctrl-A` action
+    menu, then confirm: `r` re-run failed jobs, `b` Jenkins Build Now, `u`
+    update branch, `m` Jira quick move.
   * Actions run view (`a`): the PR's workflow runs, their jobs and state, and
     the failed steps, fetched on open; open in browser as a second step.
   * Update branch: merge the base branch into the PR branch when it is behind
@@ -266,11 +268,11 @@ not provider names.
   * Refresh every 5 minutes plus manual, active view only; Review-requested
     count in the background.
   * Source health strip and stale-data marking.
-  * Private config with a version field; placeholder-only public repo.
+  * Private config; placeholder-only public repo.
 * **In-Scope, later phases:**
   * Fast Jenkins poll while builds run.
-  * Jenkins Build Now with parameters (v1: no-parameter Build Now and config
-    presets).
+  * Jenkins Build Now with parameters (v1: Build Now with the job's default
+    parameters).
   * "Last updated" activity sort.
   * In-app log viewer. The first version shows failed jobs and steps in the
     Actions run view and opens full logs in the browser.
@@ -344,13 +346,16 @@ Decided:
     is the exception: a count-only query runs in the background and feeds a
     count in the header; its rows are fetched when the user switches to it.
     On every view switch, ghtop shows the cached rows (marked with their age)
-    right away and refreshes in the background.
-14. Planning set: the full file tree in `CHECKLIST.md`. Each file is drafted or
-    edited by a small, single-purpose agent that gets the brief, the checklist
-    rules and the files it depends on; the author reviews each file.
-15. Process: every decision is recorded in `docs/decisions/` (one file per
-    decision), and `docs/architecture.md` keeps Mermaid diagrams of the system,
-    updated in the same change as the code.
+    right away and refreshes in the background. A fetch started before
+    leaving a view still completes into its cache; only the view on screen
+    is polled.
+14. Planning set: reduced in the 2026-11-09 review (item 27) to the design
+    doc, `implementation.md`, `core/keymap.md`, `config.md` and
+    `services/github.md`; other detail is written per milestone.
+15. Process: every decision is recorded in this file (this list, or a section
+    like "GitHub access" below), and `docs/architecture.md` keeps Mermaid
+    diagrams and flows of the system, updated in the same change as the code.
+    The PR template reminds agents of both.
 
 16. Jira and Jenkins are optional. On start, ghtop checks each source (Jira:
     `twg` installed and logged in; Jenkins: `JENKINS_TOKEN` set and the host
@@ -366,9 +371,9 @@ Decided:
     fetched only when an action or the detail view needs it. Chosen over URL
     parsing because it does not break when GitHub changes its URLs, and the
     lazy fetch keeps the cost off the main query.
-19. Jenkins trust rules come from config: exact host list, the job URL pattern
-    that allows Build Now, and whether to follow the queue item to the new
-    build.
+19. Jenkins trust rules come from config: exact host list and the job URL
+    pattern that allows Build Now. (Queue following is fixed behavior since
+    item 27.)
 20. Confirmations use a k9s-style modal: a dialog that names the action and the
     exact target, with Cancel selected by default and OK one key away.
 
@@ -376,8 +381,8 @@ Decided:
     then the branch name; the PR body is used only when neither has a key. `t`
     and `m` act on the primary key; other keys show in the detail view.
     Revisit if it picks the wrong ticket.
-22. Config: TOML at `~/.config/ghtop/config.toml` (honours `$XDG_CONFIG_HOME`),
-    overridable with `GHTOP_CONFIG` or `--config`; a `version` field. TOML
+22. Config: TOML at `~/.config/ghtop/config.toml`, overridable with
+    `--config` (lookup chain and `version` field dropped in item 27). TOML
     chosen after comparing examples (`config.md`): no indentation rules, no
     type surprises, raw single-quoted strings for regex. The new file name
     also cannot collide with the old attempt's `config.yaml`. PR titles are
@@ -389,26 +394,153 @@ Decided:
     columns drop first.
 24. Deferred topics are kept in `DEFERRED.md` and curated by the author.
 
-25. Added during drafting (accepted by author 2026-11-08): GitHub access
-    through a `gh` subprocess behind domain interfaces (`PRSource`,
-    `ActionsProvider`, Jenkins client, `Tracker`) with a closed command list
-    (decision 0009); one shared process runner for `gh` and `twg`;
-    `BurntSushi/toml`; OSC 52 clipboard; MIT license; pre-commit leak guard
-    reading a private denylist; GitHub CI workflow; PR template; Jenkins state
-    from `<job>/lastBuild/` so Jira and Jenkins refresh while GitHub data is
+25. Added during drafting (accepted by author 2026-11-08; amended by item
+    27): GitHub access through a `gh` subprocess with a closed command list
+    (section "GitHub access" below); one shared process runner for `gh` and
+    `twg`; `BurntSushi/toml`; MIT license; pre-commit leak
+    guard reading a private denylist; PR template; Jenkins state from
+    `<job>/lastBuild/` so Jira and Jenkins refresh while GitHub data is
     stale.
-26. Tool versions: minimum `gh` 2.103.3 and `twg` 1.3.8 (installed on the
-    author's machine on 2026-11-08; `gh` 2.103.3 is the latest release). Go:
-    latest stable at the start of coding (not installed yet).
+26. Tool versions: tested with `gh` 2.103.3 and `twg` 1.3.8 (installed on the
+    author's machine on 2026-11-08); no version check at run time (item 27).
+    Go: latest stable at the start of coding.
+
+27. Plan review, 2026-11-09 (Goldfish Stage 9 plus an over-engineering pass;
+    log in [docs/reviews/2026-11-09-decisions.md](../reviews/2026-11-09-decisions.md)). ghtop is a personal tool: one user, macOS
+    and Linux, no CI.
+    *   Planning: one spec kept (`services/github.md`, the explicit command
+        list); other specs, the per-file review gate, glossary, layout file
+        and mockups dropped. ADR files dropped; 0009 folded into this file.
+        Old docs deleted, not archived.
+    *   Milestones: M1 read-only GitHub with a framework check (replaces the
+        separate spike, item 11), M2 Jira and Jenkins state, M3 detail and
+        actions.
+    *   Tooling: no CI, no coverage targets, no Makefile. `pre-commit` runs
+        gofmt, go vet, golangci-lint (v2 config, defaults plus gosec), `go
+        test` on push, and the leak guard. `--version` from build info.
+    *   Runtime: config path `~/.config/ghtop/config.toml` or `--config`, no
+        `version` key, no `${VAR}`; no `ghtop doctor`, no minimum-version
+        checks; three error hints (auth expired, VPN off?, rate limited);
+        debug log never records headers or bodies; header shows remaining
+        GitHub budget, no floor or hourly cap; concrete clients, `proc.Runner`
+        the only interface; Jenkins Build Now with default parameters, job
+        picker, queue checked at 10 s and 20 s, no crumb, no presets.
+    *   Decided open questions: Merged view uses `updated:>=`; org required;
+        leak guard is a pre-commit hook with a private denylist file; latest
+        major library versions; "ready to merge" from GitHub's
+        `reviewDecision` and `mergeStateStatus`.
+    *   Round 2 (re-audit): copy PR/ticket URL (`c`/`C`) dropped, so no
+        clipboard code; see `DEFERRED.md`.
+    *   Round 2 (re-audit): "behind" shown from M1 through one REST compare
+        per open PR (`gh api repos/<owner>/<repo>/compare/<base>...<head>`,
+        `behind_by`), for the active view only, never Merged; conflicts still
+        from `mergeStateStatus`.
 
 Open, to settle in the planning files (see `CHECKLIST.md` for where):
 
-- Root cause of the old UI bugs.
-- Merged view filter: `merged:>=` or `updated:>=` (pr-tracker uses `updated`,
-  which includes closed-unmerged PRs).
-- GitHub budget: the query split is an implementation detail for
-  `core/refresh.md` and `services/github.md`. The brief keeps only the
-  constraint: refresh stays at or under 1500 points per hour by default,
-  measured from the cost GitHub returns.
 - Fast Jenkins poll (later phase): trigger, interval, maximum duration.
-- Leak-guard mechanism.
+
+## GitHub access
+
+Folded in from decision record 0009 (accepted 2026-11-08), amended by item 27.
+
+### Context
+
+ghtop needs GitHub for: one GraphQL search per view, a count-only query for
+Review-requested, one REST compare per open PR for behind-by, REST calls for Actions runs and jobs,
+re-run of failed jobs, and update-branch. The `gh` CLI is a prerequisite and
+already holds the login. pr-tracker calls `gh api graphql` as a subprocess.
+
+### Facts checked (2026-11-08)
+
+*   **Rate limits are the same for every option.** All three use the same token
+    from `gh`, so they draw on the same budgets: 5000 GraphQL points per hour
+    and 5000 REST requests per hour, plus GitHub's secondary limits. `gh api`
+    makes no hidden extra calls. GraphQL returns `rateLimit { cost remaining
+    resetAt }` in the body either way; for REST, the remaining count is in
+    response headers, which the library exposes directly and the subprocess
+    shows only with `gh api -i`.
+*   **gh-dash uses both**: reads go through `go-gh`
+    (`gh.DefaultGraphQLClient()` in `internal/data/prapi.go`, with
+    `shurcooL-graphql` for typed queries); actions run the `gh` CLI as a
+    subprocess (`exec.Command("gh", ...)` in
+    `internal/tui/components/tasks/pr.go`).
+
+### Options
+
+*   **A: run the `gh` CLI as a subprocess** (`gh api graphql`, `gh api` for
+    REST, `gh pr update-branch`). Uses whatever host and auth `gh` has, no
+    token handling in ghtop, easy to test with a fake runner; each call costs
+    a process start (tens of ms); errors arrive as exit codes and stderr text.
+    Fails when `gh` output or error text changes between versions.
+*   **B: the `go-gh` library**, reading token and host from `gh`'s config and
+    making HTTP calls in ghtop. Typed errors, no process starts, installable
+    as `gh ghtop`; ghtop holds the token and must keep it out of logs. Fails
+    when `gh` stores the token where `go-gh` cannot read it, or the library's
+    API changes.
+*   **C: library for reads, `gh` subprocess for writes** (gh-dash's pattern).
+    Two access paths to test and two error formats to map; fails when the two
+    paths disagree on host or auth.
+
+### Decision
+
+Option A: ghtop calls the `gh` CLI as a subprocess.
+
+*   **Two layers.**
+    *   Concrete clients used by the rest of ghtop: `github.Client` (search
+        per view, review-requested count, behind-by, update branch) and
+        `actions.Client` (runs, jobs, re-run failed), with domain-level
+        methods. Callers never see `gh` arguments or output, so a later switch
+        to option B or C rewrites these packages only. No interfaces until a
+        second implementation exists (item 27).
+    *   Below them, a small runner (`proc.Runner`) is the only code that
+        starts processes: `Run(ctx, name, args) -> stdout, stderr, exit code`
+        for `gh` and `twg`, and `Start(name, args) -> error` for the browser
+        opener, which runs detached (output to `/dev/null`, `cmd.WaitDelay`
+        set, only a failure to start is reported).
+*   **A closed command list.** Every `gh` and `twg` command ghtop runs is
+    listed, with placeholders, in `services/github.md`, so each can be run by
+    hand to check access and output shape. No command is built outside this
+    list.
+
+Rejected by author for now: option B (more code, token handling in ghtop) and
+option C (two access paths).
+
+### Consequences
+
+*   **Domain-level methods.** No `RunGh(args)` exposed to callers.
+*   **Arguments as a list, never through a shell.** GraphQL values go in as
+    variables, never pasted into the query text (pr-tracker pastes names into
+    its behind-by query; ghtop does not). Queries are embedded in the binary
+    and passed inline as `-f query=<text>`. Repo names, branch names and
+    numbers are validated first.
+*   **`-f` for strings.** `-f` (raw string) for every string value; `-F` only
+    for numbers and booleans that ghtop itself produces. Why: `-F` reads a
+    file when the value starts with `@`, converts true/false/null/numbers, and
+    fills `{owner}`/`{repo}`/`{branch}`; branch names and titles from other
+    people's PRs are untrusted.
+*   **No prompts, no pager, no color.** Run with `GH_PROMPT_DISABLED=1`,
+    `GH_PAGER=` (empty), `NO_COLOR=1`, so a `gh` command can never wait for
+    input or open a pager behind the terminal UI.
+*   **Timeouts and cancel.** Every call has a 30 s timeout and is killed on
+    quit. Leaving a view does not cancel its fetch; the result fills that
+    view's cache.
+*   **Error mapping.** Exit code plus stderr map to three hints: `(HTTP
+    401)`/"gh auth login" -> auth expired; rate-limit text -> rate limited.
+    Anything else shows the last stderr line. Tests pin these strings, so a
+    `gh` upgrade that changes them fails a test instead of the UI.
+*   **Partial GraphQL errors.** `gh api graphql` exits non-zero when the
+    response has `errors`, even when `data` is present (for example one repo
+    behind SAML/SSO, one node timeout). With `data`, ghtop shows the rows and
+    the `errors` messages as a status-bar warning (source stays ok); the fetch
+    fails (source stale, hint mapping) only when there is no `data`.
+*   **Budget reading.** GraphQL queries request `rateLimit { cost remaining
+    resetAt }`; the header shows the remaining budget.
+*   **Concurrency cap.** At most 4 processes at once (constant), so opening the
+    Actions view on a PR with many runs does not start dozens of processes.
+    The detached browser opener does not count against it.
+*   **Tests** use a fake runner that returns recorded, scrubbed outputs
+    (placeholders only); no test starts a real `gh`.
+*   **Logs** with `--debug` record the command name, arguments (query file
+    name instead of query text), duration and exit code; `gh` never prints the
+    token.

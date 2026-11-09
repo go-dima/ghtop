@@ -7,8 +7,10 @@
 This document is the entry point for ghtop's design: problem, goals, scope and
 user journeys. Everything else lives in small linked files, each fact in one
 file only: the technical plan in [architecture.md](../architecture.md),
-decisions in `docs/decisions/`, detailed specs in `docs/plan/` (`core/`,
-`views/`, `services/`, `config.md`). Files link to each other and never copy.
+decisions in [concepts_brief.md](../plan/concepts_brief.md), specs in
+`docs/plan/` (`core/keymap.md`, `services/github.md`, `config.md`) and the
+file plan in [implementation.md](../plan/implementation.md). Files link to
+each other and never copy.
 Predecessor: [concepts_brief.md](../plan/concepts_brief.md). Planning files
 and progress: [CHECKLIST.md](../plan/CHECKLIST.md).
 
@@ -26,7 +28,7 @@ It has four views of the same PR table, one on screen at a time:
 | View | What it shows | GitHub search |
 |---|---|---|
 | Open | my open PRs | `is:pr author:@me org:<org> is:open` |
-| Merged | my PRs closed in the last 14 days | `is:pr author:@me org:<org> is:closed` + date filter |
+| Merged | my PRs closed in the last 14 days (merged or not) | `is:pr author:@me org:<org> is:closed updated:>=<date>` |
 | Review-requested | PRs where my review is requested now | `is:pr review-requested:@me org:<org> is:open` |
 | Involved | open PRs by others that involve me, active in the last 14 days | `is:pr involves:@me -author:@me org:<org> is:open updated:>=<date>` |
 
@@ -78,8 +80,9 @@ Related tools used as references, not as problems to fix:
 *   **Four views, one table.** Open, Merged (14 days), Review-requested and
     Involved (open, 14 days) are separate views on the same table component.
     A view differs only in its data source.
-*   **Act without leaving the terminal**, each action on the highlighted row
-    and confirmed in a dialog that names the target:
+*   **Act without leaving the terminal**, each action on the highlighted row.
+    Plain keys open or show things directly; actions that change something
+    (the `Ctrl-A` menu) are confirmed in a dialog that names the target:
     *   `o` open the PR in the browser
     *   `t` open the ticket in the browser
     *   `b` open a Jenkins build in the browser (picker when the PR has
@@ -94,7 +97,7 @@ Related tools used as references, not as problems to fix:
         (keys: [core/keymap.md](../plan/core/keymap.md)). The actions:
     *   move the ticket by a configured quick move
     *   re-run a failed GitHub Actions run
-    *   Jenkins Build Now on the PR job, with configured parameter presets
+    *   Jenkins Build Now on the PR job, with the job's default parameters
     *   **update branch** when the PR is behind its base branch (the base the PR
         targets, for example `develop` or `main`): if GitHub reports no
         conflicts, ghtop merges the base into the PR branch through GitHub's
@@ -106,10 +109,10 @@ Related tools used as references, not as problems to fix:
         checkout must be pulled afterwards; the confirm dialog says both.
 *   **Navigation like k9s:** arrow keys and `j/k`, `Enter` for the PR detail
     view, `Esc` back, `/` filter, `:` commands, `?` help, `r` refresh.
-*   **Stay inside the GitHub budget.** Refresh uses at most 1500 GraphQL points
-    per hour by default, measured from the cost GitHub returns. Only the view
-    on screen is fetched; Review-requested also runs a count-only query in the
-    background to show a count in the header.
+*   **Light on the GitHub budget.** Only the view on screen is fetched, every
+    5 minutes and on `r`; Review-requested also runs a count-only query in the
+    background to show a count in the header. The header shows the remaining
+    GitHub budget from the `rateLimit` that every query returns.
 *   **Refresh rules:** every 5 minutes and on `r`; no faster poll while CI
     runs. Rows with running checks show a running mark and the header shows how
     many builds are running, so I can see when a manual refresh is worth it.
@@ -143,8 +146,8 @@ Related tools used as references, not as problems to fix:
     PRs through their checks.
 *   **An in-app log viewer** in the first version. Failure reason = failed check
     names and summaries, then the full log in the browser or `$PAGER`.
-*   **A plugin system** for trackers or CI. Small internal interfaces with one
-    implementation each.
+*   **A plugin system** for trackers or CI. Concrete clients, one per source;
+    an interface is added only when a second implementation exists.
 *   **Changed-row highlighting and acknowledge** (pr-tracker feature).
 *   **Emoji glyphs.** Single-width symbols only.
 *   **Multiple orgs, Windows, user-overridable keymap, disk cache.** Tracked in
@@ -153,15 +156,16 @@ Related tools used as references, not as problems to fix:
 
 ## Open Questions
 
-*   **Root cause of the old UI bugs**: framework focus handling, the per-PR
-    polling, or refresh results arriving while the cursor moved. Author to
-    write down from memory (see [TASKS.md](../plan/TASKS.md)).
-*   **Merged view filter**: `merged:>=` (merged only) or `updated:>=` (also
-    closed-unmerged, as pr-tracker does).
-*   **Org filter when config has no org**: search all of GitHub for
-    `author:@me`, or refuse to start.
-*   **Leak-guard mechanism**: a local pre-commit grep built from the private
-    config.
+None open.
+
+Settled in the 2026-11-09 review: Merged uses `updated:>=` (closed PRs,
+merged or not); the org is required (ghtop refuses to start without it); the
+leak guard is a pre-commit hook reading a private denylist file; libraries use
+their latest major versions; the old UI's root cause is closed: its candidates
+(focus handling, refresh results arriving while the cursor moves) are covered
+by the M1 exit check (implementation.md, milestone M1), and the old 10 s
+per-PR `gh run list` poll is designed out; behind-by uses one REST compare per
+open PR, from M1.
 
 ## Critical User Journeys (CUJs)
 
@@ -187,11 +191,13 @@ Related tools used as references, not as problems to fix:
 
 *   **Given**: a PR whose check points to a Jenkins job that matches the
     configured job pattern on an allowed host.
-*   **When**: I choose Build Now (from the PR detail view or the `b` picker),
-    optionally with a configured parameter preset.
-*   **Then**: a dialog names the job; on OK, ghtop posts the build request,
-    follows the queue item to the new build number, and shows it in the status
-    bar with a link.
+*   **When**: I press `Ctrl-A` `b` on the PR (table or detail view; a job
+    picker opens if several jobs match). The job runs with its default
+    parameters.
+*   **Then**: a dialog names the job; on OK, ghtop posts the build request and
+    checks the queue item after 10 and 20 seconds. If the build has started,
+    the status bar shows its number with a link; otherwise it says "queued"
+    and the next refresh shows the build.
 
 ### CUJ 4: Update a branch that is behind
 
@@ -224,8 +230,8 @@ Related tools used as references, not as problems to fix:
 The technical plan and the diagrams live in
 [docs/architecture.md](../architecture.md): stack, system context, components,
 data model summary, data flow of one refresh, GitHub, Jira and Jenkins access,
-errors and source health, config, and the open GitHub access decision
-([0009](../decisions/0009-github-access.md)).
+errors and source health, config. How ghtop calls GitHub is recorded in
+[concepts_brief.md](../plan/concepts_brief.md#github-access) ("GitHub access").
 
 ## Alternatives Considered
 
@@ -237,10 +243,5 @@ plugin system, one large document).
 
 ## Detailed Implementation Plan
 
-Every file to create, change or move, the milestones (M0 spike to M7
-operability), libraries and the verification plan are in
+Files, milestones, libraries, constants and the verification plan are in
 [implementation.md](../plan/implementation.md).
-
---------------------------------------------------------------------------------
-
-*Drafted with EGM*

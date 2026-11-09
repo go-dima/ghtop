@@ -1,6 +1,6 @@
 # ghtop keymap
 
-*   **Status:** Draft (keymap session done 2026-11-08; ready for review)
+*   **Status:** Reviewed 2026-11-09
 *   **Design doc:** [ghtop.md](../../designs/ghtop.md)
 
 Legend: **fixed** = decided in the keymap session or earlier.
@@ -33,9 +33,9 @@ Notes:
 | `Home` `End` / `g` `G` | first / last row | fixed |
 | `Enter` | open PR detail view | fixed |
 | `Esc` | back / close menu or dialog / clear filter | fixed |
-| `r` | refresh now (skips cache, not the budget floor) | fixed |
+| `r` | refresh now (skips cache) | fixed |
 | `/` | filter rows by text | fixed |
-| `:` | command line (`:open`, `:merged`, `:review`, `:involved`, `:doctor`, `:q`) | fixed |
+| `:` | command line (`:open`, `:merged`, `:review`, `:involved`, `:q`) | fixed |
 | `?` | help: every key for the current screen, including the action menu letters | fixed |
 | `q` / `Ctrl-C` | quit | fixed |
 | `1` `2` `3` `4` | switch view: Open, Merged, Review-requested, Involved (shown in the header) | fixed |
@@ -48,15 +48,13 @@ Notes:
 | `t` | open primary ticket in browser | fixed |
 | `b` | open Jenkins build in browser (picker if several jobs) | fixed |
 | `a` | open Actions view (runs, jobs, failed steps) | fixed |
-| `c` | copy PR URL to clipboard | fixed |
-| `C` | copy primary ticket URL to clipboard | fixed |
 
 ## Action menu (`Ctrl-A`, then)
 
 | Key | Action | Shown when | Status |
 |---|---|---|---|
 | `r` | re-run failed jobs of the latest failed Actions run (in the Actions view: of the selected run) | a completed run has failed jobs | fixed |
-| `b` | Jenkins Build Now (picker for job and preset) | Jenkins available and a job matches the trusted pattern | fixed |
+| `b` | Jenkins Build Now with the job's default parameters (picker if several jobs) | Jenkins available and a job matches the trusted pattern | fixed |
 | `u` | update branch (merge base in); with conflicts: open PR page | PR is behind; not while GitHub has not computed the state | fixed |
 | `m` | move ticket by the configured quick move | tracker available and a quick move matches the ticket status | fixed |
 | `?` | help for the menu | always | fixed |
@@ -85,8 +83,5 @@ Notes:
 
 *   `Tab` is not used in the table (kept free, for example for focus inside
     the PR detail view); it moves between Cancel and OK in the confirm dialog.
-*   Copy (`c`, `C`) writes to the clipboard with the OSC 52 terminal sequence,
-    which also works inside tmux and over SSH, and falls back to `pbcopy` on
-    macOS. The status bar confirms what was copied.
 *   The help overlay (`?`) and the README key list are generated from this
     keymap's code, so they cannot drift from it.

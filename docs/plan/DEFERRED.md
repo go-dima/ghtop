@@ -12,7 +12,7 @@ Status: `waiting` (not planned), `next` (candidate for the next phase),
 | Fast Jenkins poll while builds run (Jenkins REST, no GitHub cost) | waiting | 5 min poll + manual refresh is enough; running builds are marked (decision #17) | builds finish and the screen lags noticeably |
 | GitHub poll faster than 5 min while CI runs | waiting | real time not needed (decision #17) | manual refresh after a running mark gets tedious |
 | In-app log viewer | waiting | biggest UI-complexity source in the old attempt; v1 opens logs in browser or `$PAGER` | failure summaries are not enough to act on |
-| Jenkins Build Now with a parameter form | waiting | v1: no-parameter Build Now and config presets | presets are not enough |
+| Jenkins Build Now with parameters | waiting | v1: Build Now uses the job's default parameters; config presets dropped (2026-11-09 review) | a build needs non-default values: read the job's parameter definitions (`/api/json?tree=property[parameterDefinitions[name,defaultParameterValue[value]]]`) and let the user edit them before posting |
 | "Last updated" activity sort (`activityAt`) | waiting | needs check times in the query (cost) and is undefined across restarts | the default group sort hides changes I care about |
 | Jira transitions that need fields (e.g. resolution) | waiting | v1 shows the error and opens the ticket | it happens often |
 | Picker for PRs with several ticket keys | waiting | primary key rule first (decision #21) | the primary key is wrong often |
@@ -22,8 +22,9 @@ Status: `waiting` (not planned), `next` (candidate for the next phase),
 | User-overridable keymap | waiting | personal tool, one keymap | someone else uses ghtop |
 | Disk cache for a warm start | waiting | in-memory cache is enough | start-up feels slow |
 | Multiple orgs | waiting | one org today | a second org shows up |
-| Windows / WSL | waiting | macOS only | needed |
-| Plugin system for trackers or CI | dropped | one tracker, two CI kinds; small interfaces are enough | a second tracker is real |
+| Windows / WSL | waiting | macOS and Linux only | needed |
+| Copy PR/ticket URL (`c`/`C`) | dropped | dropped 2026-11-09 (round 2 re-audit) | revived: OSC 52 (fails silently in Terminal.app and in tmux without `set-clipboard on`) and/or `pbcopy` (stdin only), `wl-copy`, `xclip` |
+| Plugin system for trackers or CI | dropped | one tracker, two CI kinds; concrete clients, no interfaces until a second implementation exists | a second tracker is real |
 | Changed-row highlighting and ack | dropped | activity sort covers the need | |
 | Emoji glyphs option | dropped | single-width symbols only (decision #23) | |
 | Fork of gh-dash | dropped | new tool on the same stack (decision #8) | |
