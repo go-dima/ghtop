@@ -31,11 +31,11 @@ Status legend: `[ ]` not started, `[~]` draft, `[x]` done.
 
 ## Before M1
 
-- [ ] `services/github.md` - every `gh` and `twg` command with placeholders,
+- [~] `services/github.md` - command list drafted 2026-11-09; filled in per milestone;
       search query per view, caps, the compare call for behind-by; check
       whether `mergeStateStatus` needs the `merge-info-preview` Accept header
 - [ ] M1 section of `implementation.md` - columns per view, column drop order
       at 120 and 80 columns, what counts as an unanswered thread/comment,
       glyph table (unicode + ascii), `Row` fields
-- [~] `config.md` - keys settled; check the example against the Keys table
+- [x] `config.md` - keys settled; example checked against the Keys table
 - [~] `docs/architecture.md` - matches the revised plan; update with code

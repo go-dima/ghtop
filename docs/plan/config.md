@@ -1,9 +1,10 @@
 # ghtop config
 
-*   **Status:** Reviewed 2026-11-09 (check the example against the Keys table
-    before M1)
+*   **Status:** Reviewed 2026-11-09; example checked against the Keys table
 *   **Decided:** TOML at `~/.config/ghtop/config.toml` (or `--config <path>`),
-    Go regex matched case-insensitively (brief decision #22). No `version`
+    Go regex (RE2); `key_pattern` is matched case-insensitively (brief
+    decision #22), `job_pattern` as written (URL paths are case-sensitive).
+    Jira status names are compared case-insensitively. No `version`
     key, no `${VAR}` expansion, no other lookup paths. Placeholders only in
     this file.
 
@@ -53,18 +54,31 @@ strip_key_from_title = false      # opt-in: remove a leading ticket key
 | `tracker.enabled` | bool | false | Jira on/off |
 | `tracker.site` | string | required if enabled | `example.atlassian.net` |
 | `tracker.key_pattern` | regex | required if enabled | Go regex, case-insensitive |
-| `tracker.status_order` | list of strings | `[]` | ticket status order in the sort; unknown statuses last |
-| `tracker.quick_moves` | list of `{from, to, transition?, only_when_merged?}` | `[]` | used by `Ctrl-A` `m` |
+| `tracker.status_order` | list of strings | `[]` | ticket status order in the sort; unknown statuses last; names compared case-insensitively |
+| `tracker.quick_moves` | list of `{from, to, transition?, only_when_merged?}` | `[]` | used by `Ctrl-A` `m`; see "Quick moves" below |
 | `jenkins.enabled` | bool | false | Jenkins on/off |
-| `jenkins.user` | string | `$JENKINS_USER` | the token comes only from `JENKINS_TOKEN` |
+| `jenkins.user` | string | `$JENKINS_USER` | config value wins, `JENKINS_USER` is the fallback; one of them required if enabled; the token comes only from `JENKINS_TOKEN` |
 | `jenkins.hosts` | list of strings | required if enabled | exact hosts, no scheme, https only |
-| `jenkins.job_pattern` | regex | required if enabled | path of PR jobs allowed for Build Now |
+| `jenkins.job_pattern` | regex | required if enabled | path of PR jobs allowed for Build Now; matched as written (case-sensitive) |
 | `ui.refresh` | duration | `"5m"` | the one poll interval; minimum `1m` |
 | `ui.glyphs` | `"unicode"` or `"ascii"` | `"unicode"` | single-width only |
 | `ui.strip_key_from_title` | bool | false | |
 
 "Ready to merge" is not configured: it comes from GitHub's `reviewDecision`
 and `mergeStateStatus` (see implementation.md, file 14).
+
+## Quick moves
+
+| Field | Required | Meaning |
+|---|---|---|
+| `from` | yes | the ticket's current status; the move is offered only in this status |
+| `to` | yes | the target status; the Jira transition is found by its target status |
+| `transition` | no | transition name, used when the target status alone matches 0 or 2+ transitions |
+| `only_when_merged` | no (false) | offered only when the PR is merged |
+
+At most one quick move per `from` status; a duplicate `from` is a config
+error. At run time the move runs only when exactly one transition matches;
+otherwise nothing changes and the status bar says to do it in Jira.
 
 What the example shows:
 
@@ -129,7 +143,6 @@ ui:
 ## Alternative: flat file (like pr-tracker's `config.js`)
 
 ```yaml
-version: 1
 org: example-org
 closed_days: 14
 jira_site: example.atlassian.net

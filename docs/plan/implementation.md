@@ -166,7 +166,9 @@ Named constants in their packages, not config.
     `[ui]` exactly as [config.md](./config.md) defines them; path is
     `--config`, else `~/.config/ghtop/config.toml`; unknown keys -> error
     listing them; validation (org required, regexes compile, hosts have no
-    scheme, durations parse, `ui.refresh` >= 1m, `*_days` >= 1, required keys of an enabled source present).
+    scheme, durations parse, `ui.refresh` >= 1m, `*_days` >= 1, no duplicate
+    quick-move `from`, `jenkins.user` or `JENKINS_USER` set when Jenkins is
+    enabled, required keys of an enabled source present).
     Never writes the file. Why: one place that turns the file into checked
     values; no silent defaults that widen the search.
 

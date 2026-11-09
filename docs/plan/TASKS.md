@@ -7,19 +7,21 @@ tracks what I (the author) have to do or decide.
 ## Next
 
 1. **Install Go** (latest stable, `brew install go`) and `pre-commit`.
-2. **Session: commands.** Agent drafts `services/github.md` (every `gh` and
-   `twg` command with placeholders). I review.
-3. **Finish `config.md`.** Check the example against the Keys table.
-4. **Session: M1 detail.** Agent drafts the M1 section of `implementation.md`
+2. **Session: M1 detail.** Agent drafts the M1 section of `implementation.md`
    (columns per view, drop order at 120/80, unanswered definitions, glyphs,
    Row fields). I review.
-5. **M1: read-only GitHub + framework check.**
+3. **M1: read-only GitHub + framework check.**
 
 ## Waiting on
 
 - Curate `DEFERRED.md` whenever a topic is pushed out.
 
 ## Done
+
+- 2026-11-09: `services/github.md` drafted as a working command list (filled
+  in per milestone); G2, G6 and G9 run against the real org. `config.md`
+  example checked against the Keys table; quick-move fields, regex case and
+  `jenkins.user` precedence defined.
 
 - 2026-11-09: Plan review (Goldfish Stage 9 + over-engineering pass, log in
   `docs/reviews/2026-11-09-decisions.md`). Planning set reduced, 3 milestones, no CI,
