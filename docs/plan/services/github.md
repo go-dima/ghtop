@@ -85,3 +85,4 @@ Read the `rateLimit.cost` of each search in the `--debug` log, then adjust.
 | checks per PR (rollup contexts) | 100 |
 | review threads per PR | 50 |
 | reviews per PR | 50 |
+| conversation comments per PR (`last:`) | 50 |

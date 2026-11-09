@@ -13,7 +13,7 @@ Status: `waiting` (not planned), `next` (candidate for the next phase),
 | GitHub poll faster than 5 min while CI runs | waiting | real time not needed (decision #17) | manual refresh after a running mark gets tedious |
 | In-app log viewer | waiting | biggest UI-complexity source in the old attempt; v1 opens logs in browser or `$PAGER` | failure summaries are not enough to act on |
 | Jenkins Build Now with parameters | waiting | v1: Build Now uses the job's default parameters; config presets dropped (2026-11-09 review) | a build needs non-default values: read the job's parameter definitions (`/api/json?tree=property[parameterDefinitions[name,defaultParameterValue[value]]]`) and let the user edit them before posting |
-| "Last updated" activity sort (`activityAt`) | waiting | needs check times in the query (cost) and is undefined across restarts | the default group sort hides changes I care about |
+| "Last updated" activity sort (`activityAt`) | waiting | `s` toggles to GitHub's `updatedAt` order (M1); `activityAt` also needs check times in the query (cost) and is undefined across restarts | `updatedAt` misses CI-only changes I care about |
 | Jira transitions that need fields (e.g. resolution) | waiting | v1 shows the error and opens the ticket | it happens often |
 | Picker for PRs with several ticket keys | waiting | primary key rule first (decision #21) | the primary key is wrong often |
 | Involved filter by `created` instead of `updated` | waiting | `updated` is the start (bot activity may keep PRs) | Involved view gets noisy |

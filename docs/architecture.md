@@ -103,7 +103,7 @@ flowchart TB
 
 ## Data model (summary)
 
-Field detail is written at M1 (see implementation.md).
+Field detail: implementation.md, "M1 detail: the PR table".
 
 *   **Row**: PR id, repo, number, title (as written; optional
     leading-key strip from config), URL, state (open, draft,

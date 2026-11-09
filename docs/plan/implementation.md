@@ -61,6 +61,167 @@ through by hand.
 Written during M1: what was learned about Bubble Tea focus, resize and
 refresh handling, and the library versions chosen.
 
+## M1 detail: the PR table
+
+Settled 2026-11-09 from the mockups (placeholder data). The mockups show the
+table as of M2; in M1 the `J` and `Ticket` columns are hidden and Title takes
+their width.
+
+### Columns
+
+Left to right; the same table in every view.
+
+| # | Column | Shows | Width at 120 | At 80 | From |
+|---|---|---|---|---|---|
+| 1 | (cursor) | `▸` on the selected row | 2 | 2 | UI |
+| 2 | PR | `repo#N` (org left out: one org) | 14 | 14 | search |
+| 3 | Title | as written (or key stripped, `ui.strip_key_from_title`), cut with `…` | rest | rest, min 20 | search |
+| 4 | Author | login; Review-requested and Involved views only | 10 | dropped | search |
+| 5 | Reviews | `✓N` approvals, `±N` changes requested (red) | 7 | 7 | reviews |
+| 6 | Thr | `!N` unanswered review threads, `cN` unanswered conversation comments; `–` when both are 0 | 6 | 6 | threads, comments |
+| 7 | A | worst GitHub Actions check state | 3 | 3 | check rollup |
+| 8 | J | worst Jenkins check state (M2) | 3 | 3 | check rollup + `jenkins.Match` |
+| 9 | State | see "State" below | 9 | 9 | search + compare |
+| 10 | Ticket | primary key + status (M2) | 20 | key only (8) | Jira |
+| 11 | Age | time since the PR's last update (`updatedAt`): `12m`, `5h`, `3d`, `6w` | 4 | dropped | search |
+
+Shrink order as the terminal narrows below 120 columns: Title shrinks to 20;
+then Age and Author drop; then the ticket status text drops (key stays); then
+Thr drops. PR, Reviews, A, J and State never drop. Below the width that still
+fits those, the table shows "terminal too narrow".
+
+### State
+
+One word, first match wins:
+
+1. `draft`: `isDraft`.
+2. `conflict`: `mergeStateStatus` is `DIRTY`.
+3. `update`: behind the base (`behind_by` > 0 from the compare call, or
+   `mergeStateStatus` `BEHIND`), no conflicts.
+4. `ready`: the "ready" rule of file 14 (approved, CI ok, not `DIRTY`).
+5. `–` otherwise.
+
+Merged view: `merged` or `closed` (from `merged`).
+
+### Reviews and threads
+
+*   **Approvals / changes requested:** latest review per reviewer; count those
+    whose latest state is `APPROVED` (`✓`) or `CHANGES_REQUESTED` (`±`, red).
+*   **Unanswered review thread (`!`):** unresolved thread whose last comment
+    is not by the viewer.
+*   **Unanswered comment (`c`):** conversation comment (not a review thread)
+    by another user after the viewer's last conversation comment (all of them
+    if the viewer has none). Bot authors (`__typename` `Bot`) are not counted.
+*   The viewer's login comes from `viewer { login }` in the same query.
+
+### Sort and `s`
+
+Two orders, toggled by `s`, the same in every view:
+
+*   **Groups** (default): file 14 (CI failed, ready, rest; then ticket status
+    order; then last commit, newest first).
+*   **Last update:** `updatedAt`, newest first. GitHub's time: it moves on
+    comments, pushes, labels and bot activity, not when only a CI run ends
+    (concepts_brief.md section 7; the activity-time sort stays deferred).
+
+The choice lasts for the session (not saved). The status bar names the
+current order. The cursor stays on its PR across a toggle.
+
+### Glyphs
+
+All single-width. `ui.glyphs = "ascii"` swaps them:
+
+| Meaning | unicode | ascii |
+|---|---|---|
+| passed / approvals | `✓` | `+` |
+| failed | `✗` | `x` |
+| running | `●` | `*` |
+| no checks | `○` | `o` |
+| none / not applicable | `–` | `-` |
+| changes requested | `±` | `~` |
+| unanswered thread / comment | `!` / `c` | `!` / `c` |
+| cursor | `▸` | `>` |
+| cut text | `…` | `~` |
+
+Colors (in `styles.go`): passed and `ready` green; failed, `±` and
+`conflict` red; running, `update` and unanswered counts amber; `merged`
+purple; zero counts, `–`, `draft` and `closed` dim.
+
+### Header and status bar
+
+*   **Header:** `ghtop`, view tabs `1 Open`, `2 Merged`, `3 Review (N)` (N =
+    review-requested count), `4 Involved`, then source state: `GH ok 42s rl
+    4812/5000` (age of the last good fetch, GraphQL points left), plus `Jira`
+    and `Jenkins` from M2. At 80 columns: shorter tabs and `GH✓ rl 4812`.
+*   **Status bar:** row count, current sort, last action result or warning,
+    and the main keys (`s o t b a ^A ?`).
+
+### Row fields (`model.Row`, file 12)
+
+`ID` (`owner/repo#N`), `Repo`, `Number`, `Title`, `URL`, `Author`,
+`IsDraft`, `State` (open, merged, closed), `Base`, `Head`, `HeadSHA`,
+`MergeState` (`mergeStateStatus`), `BehindBy`, `ReviewDecision`, `Approvals`,
+`ChangesRequested`, `UnansweredThreads`, `UnansweredComments`, `Checks`
+(name, kind, state, URL, app slug, workflow run id), `UpdatedAt`,
+`LastCommitAt`, `Roles`; from M2 `Tickets` (key, status; first is primary).
+
+### Query additions (file 20, `open.graphql`)
+
+`isDraft`, `author { login }`, `updatedAt`, `viewer { login }`, and the PR's
+conversation comments (`comments(last: 50) { author { login __typename }
+createdAt }`). Check the cost against the G2 baseline (27 points for 9 PRs)
+in the `--debug` log.
+
+### Mockups
+
+Open view, 120 columns, group sort:
+
+```text
+ ghtop   1 Open   2 Merged   3 Review (2)   4 Involved                      GH ok 42s rl 4812/5000  Jira ok  Jenkins ok
+
+   PR             TITLE                                       REVIEWS THR    A   J   STATE     TICKET               AGE
+▸  api#1412       Retry token refresh on 401 from the gateway ✓1 ±0   !2 c1  ✗   ✓   –         EX-482  In Progress    2h
+   web#877        Add dark mode toggle to settings page       ✓2 ±0   –      ✓   ✓   ready     EX-470  Code Review    1d
+   infra#233      Bump base image and pin node to 20.11       ✓0 ±0   !0 c2  ✓   ✓   update    EX-455  Code Review    3d
+   api#1398       Split billing webhooks into their own work… ✓1 ±1   !1 c0  ✓   ✓   conflict  EX-441  Code Review    5d
+   billing#55     Invoice export: CSV with tax columns        ✓0 ±0   –      ●   ●   –         EX-490  In Progress   12m
+   api#1420       WIP: cache org settings per request         ✓0 ±0   –      ○   –   draft     EX-493  In Progress   40m
+
+ 6 PRs · sort: CI failed → ready → rest                    s sort  o open  t ticket  b build  a actions  ^A act  ? help
+```
+
+Review-requested view, 120 columns:
+
+```text
+ ghtop   1 Open   2 Merged   3 Review (2)   4 Involved                      GH ok 42s rl 4812/5000  Jira ok  Jenkins ok
+
+   PR             TITLE                            AUTHOR     REVIEWS THR    A   J   STATE     TICKET               AGE
+▸  api#1425       Rate limit per API key instead … alice      ✓0 ±0   !0 c1  ✓   ✓   –         EX-501  Code Review    3h
+   web#880        Table virtualisation for the au… bob        ✓1 ±0   –      ●   –   update    EX-498  Code Review    1d
+
+
+
+
+
+ 2 PRs · sort: CI failed → ready → rest                    s sort  o open  t ticket  b build  a actions  ^A act  ? help
+```
+
+Open view, 80 columns:
+
+```text
+ ghtop   1 Open   2 Merged   3 Review·2   4 Inv      GH✓ Jira✓ Jenkins✓ rl 4812
+
+   PR             TITLE                REVIEWS THR    A   J   STATE     TICKET
+▸  api#1412       Retry token refresh… ✓1 ±0   !2 c1  ✗   ✓   –         EX-482
+   web#877        Add dark mode toggl… ✓2 ±0   –      ✓   ✓   ready     EX-470
+   infra#233      Bump base image and… ✓0 ±0   !0 c2  ✓   ✓   update    EX-455
+   api#1398       Split billing webho… ✓1 ±1   !1 c0  ✓   ✓   conflict  EX-441
+   billing#55     Invoice export: CSV… ✓0 ±0   –      ●   ●   –         EX-490
+   api#1420       WIP: cache org sett… ✓0 ±0   –      ○   –   draft     EX-493
+
+ 6 PRs · sort: groups                                            s o t b a ^A ?
+```
+
 ## Constants
 
 Named constants in their packages, not config.
@@ -185,7 +346,7 @@ Named constants in their packages, not config.
 *   **Proposed Changes**: `PRID` (`owner/repo#N`), `Row`, `Check`, `Ticket`,
     `MergeState`, `CIState` with the worst-first order and `Worst()`, `Roles`;
     title kept as written, plus `DisplayTitle(stripLeadingKey bool)`. Fields
-    as listed in architecture.md "Data model"; detail written at M1. Why:
+    as listed in "M1 detail: the PR table" above. Why:
     clients fill these, the UI reads them; no client types leak into the UI.
 
 #### 13. `internal/model/source.go` (Create)
@@ -472,9 +633,9 @@ Named constants in their packages, not config.
 
 #### 39. `internal/ui/table.go` (Create)
 
-*   **Proposed Changes**: the shared PR table: columns, single-width glyphs,
-    running mark, stale mark, column drop order below 120 and 80 columns,
-    cursor by `PRID`, `/` filter.
+*   **Proposed Changes**: the shared PR table as in "M1 detail: the PR
+    table" above: columns, single-width glyphs, running mark, stale mark,
+    shrink order, cursor by `PRID`, `/` filter, `s` sort toggle.
 
 #### 40. `internal/ui/header.go`, `internal/ui/statusbar.go`, `internal/ui/help.go` (Create)
 

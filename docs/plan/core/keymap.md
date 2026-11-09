@@ -35,6 +35,7 @@ Notes:
 | `Esc` | back / close menu or dialog / clear filter | fixed |
 | `r` | refresh now (skips cache) | fixed |
 | `/` | filter rows by text | fixed |
+| `s` | toggle sort: groups (CI failed, ready, rest) / last update, newest first | fixed |
 | `:` | command line (`:open`, `:merged`, `:review`, `:involved`, `:q`) | fixed |
 | `?` | help: every key for the current screen, including the action menu letters | fixed |
 | `q` / `Ctrl-C` | quit | fixed |

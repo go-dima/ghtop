@@ -389,7 +389,8 @@ Decided:
     shown as written; stripping a leading ticket key is an opt-in setting. Key
     patterns use Go regex syntax (RE2), matched case-insensitively; keys are
     stored in upper case.
-23. Glyphs: single-width symbols only (`✓ ✗ ● ○ ! –`), no emoji and no emoji
+23. Glyphs: single-width symbols only (`✓ ✗ ● ○ ! – ±`; full table and ascii
+    set in implementation.md, "M1 detail"), no emoji and no emoji
     option. Mockups at 120 columns, plus one 80-column mockup showing which
     columns drop first.
 24. Deferred topics are kept in `DEFERRED.md` and curated by the author.

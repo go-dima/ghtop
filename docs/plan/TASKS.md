@@ -7,16 +7,18 @@ tracks what I (the author) have to do or decide.
 ## Next
 
 1. **Install Go** (latest stable, `brew install go`) and `pre-commit`.
-2. **Session: M1 detail.** Agent drafts the M1 section of `implementation.md`
-   (columns per view, drop order at 120/80, unanswered definitions, glyphs,
-   Row fields). I review.
-3. **M1: read-only GitHub + framework check.**
+2. **M1: read-only GitHub + framework check.**
 
 ## Waiting on
 
 - Curate `DEFERRED.md` whenever a topic is pushed out.
 
 ## Done
+
+- 2026-11-09: M1 table settled from mockups (implementation.md, "M1 detail"):
+  State after J (ready/update/conflict/draft), threads and comments counted
+  separately, changes requested as red `±`, `s` toggles group / last-update
+  sort, Age = last update.
 
 - 2026-11-09: `services/github.md` drafted as a working command list (filled
   in per milestone); G2, G6 and G9 run against the real org. `config.md`
